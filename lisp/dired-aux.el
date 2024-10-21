@@ -3255,6 +3255,73 @@ Type \\`SPC' or \\`y' to %s one file, \\`DEL' or \\`n' to skip to next,
   (dired-rename-non-directory #'downcase "Rename downcase" arg))
 
 
+
+;;; Captured Files
+
+(defvar dired-captured-files nil
+  "List of captured Dired files.")
+
+(defun dired-capture-files ()
+  "Capture marked Dired files into `dired-captured-files'."
+  (interactive)
+  (mapc (lambda (file) (add-to-list 'dired-captured-files file)) (dired-get-marked-files))
+  (let* ((added (length (dired-get-marked-files)))
+         (total (length dired-captured-files))
+         (msg (ngettext "file is" "files are" total)))
+    (message "%d %s now captured [%s added]." total msg added)))
+
+(defun dired-captured-clear ()
+  "Empty the `dired-captured-files' list."
+  (interactive)
+  (setq dired-captured-files nil)
+  (message "Emptied the capture file list."))
+
+(defun dired-captured-execute (file-creator operation marker-char)
+  "Apply provided FILE-CREATOR, OPERATION, and MARKER-CHAR to `dired-create-files' as their respective arguments.
+
+Applies the `FILE-CREATOR' to every filename present in `dired-captured-files', with the destination
+being resolved to `dired-current-directory'.
+"
+  (if (length= dired-captured-files 0)
+    (message "No captured files to operate on.")
+    (if (not (dired-mark-pop-up " *Captured Files*" nil dired-captured-files #'yes-or-no-p
+                                (format 
+                                  (ngettext "%s [%d file]" "%s [%d files]" (length dired-captured-files))
+                                    operation (length dired-captured-files))))
+      (message "%s aborted." operation)
+      ;; prevent dired-create-files from mutating the capture list.
+      (let ((fn-list (copy-sequence dired-captured-files)))
+        (dired-create-files file-creator operation fn-list
+          (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) (dired-current-directory))) marker-char))
+      (revert-buffer))))
+
+(defun dired-captured-move ()
+  "Move the file/s from `dired-captured' to `dired-current-directory'."
+  (interactive)
+  (dired-captured-execute #'rename-file "MOVE" ?M)
+  ;; keep the files usable in the ring for other actions, by remapping the base filenames to `dired-current-directory' 
+  (setq dired-captured-files
+    (mapcar (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) (dired-current-directory))) dired-captured-files)))
+
+(defun dired-captured-copy ()
+  "Copy the file/s from `dired-captured' to `dired-current-directory'."
+  (interactive)
+  (dired-captured-execute #'dired-copy-file "COPY" ?C))
+
+(defun dired-captured-symlink ()
+  "Create a symlink to the file/s from `dired-captured'
+to `dired-current-directory'."
+  (interactive)
+  (dired-captured-execute #'make-symbolic-link "SYM-LINK" ?S))
+
+(defun dired-captured-relative-symlink ()
+  "Create a relative symlink to the file/s from `dired-captured'
+to `dired-current-directory'."
+  (interactive)
+  (dired-captured-execute #'dired-make-relative-symlink "RELATIVE SYM-LINK" ?R))
+
+
+
 ;;; Insert subdirectory
 
 ;;;###autoload
