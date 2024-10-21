@@ -3255,6 +3255,56 @@ Type \\`SPC' or \\`y' to %s one file, \\`DEL' or \\`n' to skip to next,
   (dired-rename-non-directory #'downcase "Rename downcase" arg))
 
 
+
+;;; File ring
+(defvar dired-file-ring nil
+  "Captured dired files.")
+
+(defun dired-file-ring-execute (action action-name file-list)
+  "Execute a function to run for every item in the FILE-LIST.
+Argument ACTION argument to call with `dired-create-files' with as
+its' FILE-CREATOR.
+Argument ACTION-NAME The name of the action, used for logging.
+Argument FILE-LIST List of files to preform ACTION on."
+  (dired-create-files action action-name file-list
+    (lambda (file) (concat default-directory (file-name-nondirectory (directory-file-name file)))))
+  (revert-buffer))
+
+(defun dired-file-ring-capture ()
+  "Capture marked Dired files to the file ring."
+  (interactive)
+  (mapc (lambda (file) (add-to-list 'dired-file-ring file)) (dired-get-marked-files))
+  (message "Captured %s Files. %s files are present in the file ring" (length (dired-get-marked-files)) (length dired-file-ring)))
+
+(defun dired-file-ring-clear ()
+  "Reset/clear the file ring."
+  (interactive)
+  (setq dired-file-ring nil))
+
+(defun dired-file-ring-move ()
+  "Move the file/s from the file ring to current dir.
+This action clears the file ring."
+  (interactive)
+  (dired-file-ring-execute #'rename-file "MOVE" dired-file-ring)
+  (dired-file-ring-clear))
+
+(defun dired-file-ring-copy ()
+  "Copy the file/s from the file ring to current dir."
+  (interactive)
+  (dired-file-ring-execute #'dired-copy-file "COPY" dired-file-ring))
+
+(defun dired-file-ring-symlink ()
+  "Create a symlink for the the file/s from the file ring to current dir."
+  (interactive)
+  (dired-file-ring-execute #'make-symbolic-link "SYM-LINK" dired-file-ring))
+
+(defun dired-file-ring-symlink-relative ()
+  "Create a relative symlink for the the file/s from the file ring to current dir."
+  (interactive)
+  (dired-file-ring-execute #'dired-make-relative-symlink "RELATIVE SYM-LINK" dired-file-ring))
+
+
+
 ;;; Insert subdirectory
 
 ;;;###autoload
