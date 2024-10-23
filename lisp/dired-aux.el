@@ -3261,56 +3261,57 @@ Type \\`SPC' or \\`y' to %s one file, \\`DEL' or \\`n' to skip to next,
 (defvar dired-captured-files nil
   "List of captured Dired files.")
 
-(defun dired-capture ()
-  "Capture marked Dired files."
+(defun dired-capture-files ()
+  "Capture marked Dired files into `dired-captured-files'."
   (interactive)
-  (mapc (lambda (file) (add-to-list 'dired-captured file)) (dired-get-marked-files))
-  (message "Captured %s Files. %s files are present in the file ring" (length (dired-get-marked-files)) (length dired-captured)))
+  (mapc (lambda (file) (add-to-list 'dired-captured-files file)) (dired-get-marked-files))
+  (let* ((added (length (dired-get-marked-files)))
+         (total (length dired-captured-files))
+         (msg (ngettext "file is" "files are" total)))
+    (message "%d %s now in the capture list. %s added." total msg added)))
 
 (defun dired-captured-clear ()
-  "Clear the captured Dired file list."
+  "Empty the `dired-captured-files' list."
   (interactive)
-  (setq dired-captured nil))
+  (setq dired-captured-files nil)
+  (message "Emptied the capture file list."))
 
-(defun dired-captured-execute (file-creator operation fn-list &optional marker-char)
-  "Apply FILE-CREATOR, OPERATION, and MARKER-CHAR to `dired-create-files' as their respective arguments.
+(defun dired-captured-execute (file-creator operation &optional marker-char)
+  "Apply provided FILE-CREATOR, OPERATION, and MARKER-CHAR to `dired-create-files' as their respective arguments.
 
-Filenames present in `dired-captured' are supplied to `dired-create-files' as the FN-LIST.
-These filenames are then resolved with the NAME-CONSTRUCTOR.
-
-These filenames have their base filename resolved with `expand-filename' using either
-`dired-current-directory' or `default-directory' as the DEFAULT-DIRECTORY, depening on
-if the `current-buffer' is a Dired buffer, or not.
+Applies the `FILE-CREATOR' to every filename present in `dired-captured-files', with the destination
+being resolved to `dired-current-directory'.
 "
-  ;; Prefer dired-current-directory
-  (let ((dir (or (ignore-errors (dired-current-directory)) default-directory)))
-    (dired-create-files file-creator operation dired-captured
-      (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) dir)) marker-char))
+  ;; prevent dired-create-files from mutating the capture list.
+  (let ((fn-list (copy-sequence dired-captured-files)))
+    (dired-create-files file-creator operation fn-list
+      (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) (dired-current-directory))) marker-char))
   (revert-buffer))
 
 (defun dired-captured-move ()
-  "Move the file/s from the file ring to current dir.
-This action clears the file ring."
+  "Move the file/s from `dired-captured' to `dired-current-directory'."
   (interactive)
-  (dired-captured-execute #'rename-file "MOVE" dired-captured)
-  (let ((dir (or (ignore-errors (dired-current-directory)) default-directory)))
-    (setq dired-captured
-          (mapcar (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) dir)) dired-captured))))
+  (dired-captured-execute #'rename-file "MOVE")
+  ;; keep the files usable in the ring for other actions, by remapping the base filenames to `dired-current-directory' 
+  (setq dired-captured-files
+    (mapcar (lambda (file) (expand-file-name (file-name-nondirectory (directory-file-name file)) (dired-current-directory))) dired-captured-files)))
 
 (defun dired-captured-copy ()
-  "Copy the file/s from the file ring to current dir."
+  "Copy the file/s from `dired-captured' to `dired-current-directory'."
   (interactive)
-  (dired-captured-execute #'dired-copy-file "COPY" dired-captured))
+  (dired-captured-execute #'dired-copy-file "COPY"))
 
 (defun dired-captured-symlink ()
-  "Create a symlink for the the file/s from the file ring to current dir."
+  "Create a symlink to the file/s from `dired-captured'
+to `dired-current-directory'."
   (interactive)
-  (dired-captured-execute #'make-symbolic-link "SYM-LINK" dired-captured))
+  (dired-captured-execute #'make-symbolic-link "SYM-LINK"))
 
 (defun dired-captured-relative-symlink ()
-  "Create a relative symlink for the the file/s from the file ring to current dir."
+  "Create a relative symlink to the file/s from `dired-captured'
+to `dired-current-directory'."
   (interactive)
-  (dired-captured-execute #'dired-make-relative-symlink "RELATIVE SYM-LINK" dired-captured))
+  (dired-captured-execute #'dired-make-relative-symlink "RELATIVE SYM-LINK"))
 
 
 
